@@ -15,6 +15,10 @@ name: Release
 on:
   push:
     tags: ['v*.*.*']
+  # Manual re-run for the current Cargo.toml version (e.g. to complete a partial
+  # release). The version is read from Cargo.toml, not the ref, and every
+  # publish job is idempotent, so this is safe to run repeatedly.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -36,6 +40,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Tag matches crate version
+        if: github.ref_type == 'tag'
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
           if ! grep -q "^version = \"${tag_version}\"$" Cargo.toml; then
@@ -62,7 +67,7 @@ jobs:
             echo "::warning::CARGO_REGISTRY_TOKEN not set; skipping crates.io publish"
             exit 0
           fi
-          ver="${GITHUB_REF_NAME#v}"
+          ver="$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)"
           if curl -sf https://index.crates.io/c2/pa/c2pa-ml | grep -q "\"vers\":\"${ver}\""; then
             echo "crates.io already has c2pa-ml ${ver}; skipping"
             exit 0
@@ -91,7 +96,7 @@ jobs:
             echo "::warning::NPM_TOKEN not set; skipping npm publish"
             exit 0
           fi
-          ver="${GITHUB_REF_NAME#v}"
+          ver="$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)"
           if npm view "c2pa-ml@${ver}" version >/dev/null 2>&1; then
             echo "npm already has c2pa-ml@${ver}; skipping"
             exit 0
@@ -173,8 +178,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "release $GITHUB_REF_NAME already exists; skipping"
+          ver="$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)"
+          tag="v${ver}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release $tag already exists; skipping"
             exit 0
           fi
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release create "$tag" --title "$tag" --generate-notes
