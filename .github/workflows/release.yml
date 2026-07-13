@@ -29,11 +29,9 @@ jobs:
           components: rustfmt, clippy
       - name: Tag matches crate version
         run: |
-          crate_version="$(cargo metadata --no-deps --format-version 1 \
-            | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)"
           tag_version="${GITHUB_REF_NAME#v}"
-          if [ "$crate_version" != "$tag_version" ]; then
-            echo "::error::tag $tag_version does not match crate version $crate_version"
+          if ! grep -q "^version = \"${tag_version}\"$" Cargo.toml; then
+            echo "::error::tag ${tag_version} does not match the version in Cargo.toml"
             exit 1
           fi
       - run: cargo fmt --all -- --check
