@@ -23,7 +23,7 @@ A remote (or side-car) manifest can instead be referenced by URI under `c2pa.man
 
 The [C2PA Technical Specification](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html) defines no dedicated embedding method for model containers; a manifest embedded in a model declares what the asset is with the [asset type assertion](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html#_asset_type). This crate provides the canonical `c2pa.types.model.*` strings for that assertion.
 
-Zero dependencies.
+Zero dependencies on native targets; the WebAssembly/npm build uses only `wasm-bindgen`.
 
 ## Quick Start
 

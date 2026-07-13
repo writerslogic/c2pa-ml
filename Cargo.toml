@@ -7,5 +7,13 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/writerslogic/c2pa-ml"
 keywords = ["c2pa", "provenance", "gguf", "safetensors", "onnx"]
 categories = ["encoding", "parser-implementations"]
+readme = "README.md"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+
+# The npm distribution is a `wasm32` build; native targets stay dependency-free.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"

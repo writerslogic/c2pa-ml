@@ -46,7 +46,8 @@
 //! manifests. The `c2pa.hash.data` assertion should exclude the metadata region
 //! carrying the Manifest Store.
 //!
-//! Zero dependencies.
+//! Zero dependencies on native targets; the WebAssembly/npm build uses only
+//! `wasm-bindgen`.
 
 mod base64;
 mod json;
@@ -59,6 +60,9 @@ pub mod safetensors;
 mod error;
 mod format;
 mod manifest;
+
+#[cfg(target_arch = "wasm32")]
+mod wasm;
 
 pub use asset_type::ModelType;
 pub use error::Error;
