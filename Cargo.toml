@@ -1,0 +1,11 @@
+[package]
+name = "c2pa-ml"
+version = "0.1.0"
+edition = "2021"
+description = "C2PA manifest embedding for AI/ML model container formats: GGUF, SafeTensors, and ONNX"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/writerslogic/c2pa-ml"
+keywords = ["c2pa", "provenance", "gguf", "safetensors", "onnx"]
+categories = ["encoding", "parser-implementations"]
+
+[dependencies]
