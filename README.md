@@ -88,6 +88,37 @@ use c2pa_ml::{embed_manifest_as, Format, ManifestSource};
 let signed = embed_manifest_as(model, Format::Onnx, &ManifestSource::embedded(store)).unwrap();
 ```
 
+## Other languages
+
+The same API is published for JavaScript and Python from this crate, so it also serves Node, pnpm, and browser/bundler users.
+
+### npm / pnpm (WebAssembly)
+
+```bash
+npm install c2pa-ml   # or: pnpm add c2pa-ml
+```
+
+```js
+import { embedManifest, readManifest, detectFormat } from "c2pa-ml";
+
+const signed = embedManifest(model, store); // Uint8Array in, Uint8Array out
+const manifest = readManifest(signed);
+```
+
+### PyPI
+
+```bash
+pip install c2pa-ml
+```
+
+```python
+import c2pa_ml
+
+signed = c2pa_ml.embed_manifest(model, store)  # bytes in, bytes out
+manifest = c2pa_ml.read_manifest(signed)
+fmt = c2pa_ml.detect_format(model)             # "GGUF" | "SafeTensors" | "ONNX" | None
+```
+
 ## Design
 
 - The Manifest Store and/or manifest URI are stored under the reserved keys `c2pa.manifest` / `c2pa.manifest.uri` in the format's native metadata slot

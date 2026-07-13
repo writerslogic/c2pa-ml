@@ -64,6 +64,9 @@ mod manifest;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
+#[cfg(feature = "python")]
+mod python;
+
 pub use asset_type::ModelType;
 pub use error::Error;
 pub use format::{

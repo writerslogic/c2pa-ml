@@ -7,6 +7,7 @@ name: Release
 # its secret is absent, so a tag can drive a partial release:
 #   CARGO_REGISTRY_TOKEN  — crates.io API token
 #   NPM_TOKEN             — npmjs.com automation token (publishes `c2pa-ml`)
+#   PYPI_TOKEN            — PyPI API token (publishes the `c2pa-ml` wheels)
 
 on:
   push:
@@ -27,6 +28,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
       - name: Tag matches crate version
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
@@ -35,8 +40,9 @@ jobs:
             exit 1
           fi
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-features -- -D warnings
-      - run: cargo test --all-features
+      - run: cargo clippy --features python -- -D warnings
+      - run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo test
 
   crates-io:
     name: Publish to crates.io
@@ -79,6 +85,67 @@ jobs:
           fi
           wasm-pack build --target bundler --out-dir pkg
           npm publish pkg --access public
+
+  wheels:
+    name: Build wheels (${{ matrix.platform.os }} ${{ matrix.platform.target }})
+    needs: verify
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { os: ubuntu-latest, target: x86_64 }
+          - { os: ubuntu-latest, target: aarch64 }
+          - { os: macos-latest, target: aarch64 }
+          - { os: macos-13, target: x86_64 }
+          - { os: windows-latest, target: x64 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --features python
+          manylinux: auto
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform.os }}-${{ matrix.platform.target }}
+          path: dist
+
+  sdist:
+    name: Build sdist
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist
+
+  pypi:
+    name: Publish to PyPI
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - name: maturin upload
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          if [ -z "$MATURIN_PYPI_TOKEN" ]; then
+            echo "::warning::PYPI_TOKEN not set; skipping PyPI publish"
+            exit 0
+          fi
+          pip install --upgrade maturin
+          maturin upload --skip-existing dist/*
 
   github-release:
     name: GitHub release
