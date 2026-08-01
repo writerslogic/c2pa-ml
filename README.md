@@ -15,11 +15,11 @@ Associates a C2PA Manifest Store with an AI/ML model by writing it into the mode
 
 | Format | Metadata slot | Manifest encoding |
 |---|---|---|
-| **GGUF** (llama.cpp) | typed key/value metadata | `c2pa.manifest` as a `UINT8` array (raw bytes) |
-| **SafeTensors** | JSON header `__metadata__` | `c2pa.manifest` as Base64 |
-| **ONNX** | protobuf `metadata_props` | `c2pa.manifest` as Base64 |
+| **GGUF** (llama.cpp) | typed key/value metadata | `c2pa:manifest` as a `UINT8` array (raw bytes) |
+| **SafeTensors** | JSON header `__metadata__` | `c2pa:manifest` as Base64 |
+| **ONNX** | protobuf `metadata_props` | `c2pa:manifest` as Base64 |
 
-A remote (or side-car) manifest can instead be referenced by URI under `c2pa.manifest.uri`, or both an embedded store and a URI can be written together.
+A remote (or side-car) manifest can instead be referenced by URI under `c2pa:manifest.uri`, or both an embedded store and a URI can be written together.
 
 The [C2PA Technical Specification](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html) defines no dedicated embedding method for model containers; a manifest embedded in a model declares what the asset is with the [asset type assertion](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html#_asset_type). This crate provides the canonical `c2pa.types.model.*` strings for that assertion.
 
@@ -121,7 +121,7 @@ fmt = c2pa_ml.detect_format(model)             # "GGUF" | "SafeTensors" | "ONNX"
 
 ## Design
 
-- The Manifest Store and/or manifest URI are stored under the reserved keys `c2pa.manifest` / `c2pa.manifest.uri` in the format's native metadata slot
+- The Manifest Store and/or manifest URI are stored under the reserved keys `c2pa:manifest` / `c2pa:manifest.uri` in the format's native metadata slot
 - **GGUF**: metadata is re-serialized and the tensor-data region is re-padded to `general.alignment`; tensor-info offsets are relative to that region, so tensor data is never rewritten
 - **SafeTensors**: only the JSON header is rewritten; each tensor's `data_offsets` are relative to the data block and stay valid
 - **ONNX**: only the top-level protobuf field stream is rewritten; every other field (`ir_version`, `graph`, `opset_import`, …) is copied through verbatim
@@ -133,13 +133,25 @@ This crate implements embedding and extraction only. Manifest construction, sign
 
 ## Related Crates
 
+Part of a family of single-purpose crates, one per C2PA embedding method. Each
+is standalone and independently versioned.
+
 | Crate | Description |
 |---|---|
-| [c2pa-fonts](https://crates.io/crates/c2pa-fonts) | OpenType/TrueType (SFNT) font embedding |
+| [c2pa-structured-text](https://crates.io/crates/c2pa-structured-text) | Structured text: ASCII-armoured manifest in a comment or front matter |
+| [c2pa-unstructured-text](https://crates.io/crates/c2pa-unstructured-text) | Unstructured text: invisible Unicode variation-selector run |
+| [c2pa-html](https://crates.io/crates/c2pa-html) | HTML: `script` and `link` elements in the document head |
+| [c2pa-http](https://crates.io/crates/c2pa-http) | HTTP: the `c2pa-manifest` `Link` header, with a Tower middleware |
+| [c2pa-text-binding](https://crates.io/crates/c2pa-text-binding) | Soft binding and content fingerprinting for text assets |
+| [c2pa-vtt](https://crates.io/crates/c2pa-vtt) | WebVTT caption and subtitle embedding |
+| [c2pa-zip](https://crates.io/crates/c2pa-zip) | ZIP-based documents: EPUB, DOCX, ODT, OXPS |
 | [c2pa-warc](https://crates.io/crates/c2pa-warc) | WARC web archive embedding (ISO 28500) |
-| [c2pa-zip](https://crates.io/crates/c2pa-zip) | ZIP-based (OCF) document embedding: EPUB, DOCX, ODT |
-| [c2pa-structured-text](https://crates.io/crates/c2pa-structured-text) | Structured text embedding via ASCII armour delimiters |
-| [c2pa-rs](https://crates.io/crates/c2pa) | Official C2PA SDK |
+| [c2pa-fonts](https://crates.io/crates/c2pa-fonts) | OpenType/TrueType (SFNT) font embedding |
+| [c2pa](https://crates.io/crates/c2pa) | Official C2PA SDK |
+
+## Security
+
+Found a vulnerability? Please report it privately — see [SECURITY.md](./SECURITY.md).
 
 ## License
 
