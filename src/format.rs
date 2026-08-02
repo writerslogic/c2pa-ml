@@ -139,7 +139,7 @@ pub fn verify(data: &[u8]) -> Result<Report, Error> {
     })
 }
 
-fn detect(data: &[u8]) -> Result<Format, Error> {
+pub(crate) fn detect(data: &[u8]) -> Result<Format, Error> {
     Format::detect(data).ok_or(Error::UnknownFormat)
 }
 

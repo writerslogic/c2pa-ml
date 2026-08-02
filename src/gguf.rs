@@ -2,9 +2,9 @@
 //!
 //! GGUF stores a block of typed key/value metadata at the head of the file,
 //! ahead of the tensor information and tensor data. A C2PA Manifest Store is
-//! embedded as a metadata entry under the reserved key `c2pa.manifest`, typed
+//! embedded as a metadata entry under the reserved key `c2pa:manifest`, typed
 //! as an array of `UINT8` so the raw JUMBF bytes survive byte-exact; a remote
-//! manifest URI is stored under `c2pa.manifest.uri` as a `STRING`.
+//! manifest URI is stored under `c2pa:manifest.uri` as a `STRING`.
 //!
 //! Tensor-info offsets are relative to the start of the aligned tensor-data
 //! region, so inserting metadata and re-padding to `general.alignment` leaves
@@ -194,7 +194,7 @@ fn decode_u8_array(value: &[u8]) -> Result<Vec<u8>, Error> {
     let mut c = Cursor::new(value);
     if c.u32()? != T_ARRAY || c.u32()? != T_UINT8 {
         return Err(Error::Malformed(
-            "c2pa.manifest is not a UINT8 array".into(),
+            "c2pa:manifest is not a UINT8 array".into(),
         ));
     }
     let count = c.u64()? as usize;
@@ -212,7 +212,7 @@ fn encode_string(s: &str) -> Vec<u8> {
 fn decode_string(value: &[u8]) -> Result<String, Error> {
     let mut c = Cursor::new(value);
     if c.u32()? != T_STRING {
-        return Err(Error::Malformed("c2pa.manifest.uri is not a string".into()));
+        return Err(Error::Malformed("c2pa:manifest.uri is not a string".into()));
     }
     let len = c.u64()? as usize;
     let bytes = c.take(len)?;

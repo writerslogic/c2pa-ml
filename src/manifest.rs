@@ -2,16 +2,24 @@
 //! it is stored under.
 
 /// The reserved metadata key carrying an embedded C2PA Manifest Store.
-pub(crate) const STORE_KEY: &str = "c2pa.manifest";
+///
+/// The specification names this key for both ONNX (`ModelProto.metadata_props`)
+/// and SafeTensors (the JSON header's `__metadata__` object). The separator is a
+/// colon, not a dot.
+pub(crate) const STORE_KEY: &str = "c2pa:manifest";
 
 /// The reserved metadata key carrying a remote (or side-car) manifest URI.
-pub(crate) const URI_KEY: &str = "c2pa.manifest.uri";
+///
+/// The specification defines no remote-URI key for these formats, so this is a
+/// crate extension. It is namespaced to match [`STORE_KEY`] so the two travel
+/// together, and a validator that does not know it simply ignores it.
+pub(crate) const URI_KEY: &str = "c2pa:manifest.uri";
 
 /// What to associate with a model: an embedded Manifest Store, a remote manifest
 /// URI, or both.
 ///
 /// Each supported format stores these in the same reserved keys
-/// (`c2pa.manifest` / `c2pa.manifest.uri`) within its native metadata slot.
+/// (`c2pa:manifest` / `c2pa:manifest.uri`) within its native metadata slot.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ManifestSource {
     /// URI of the active manifest. The caller fetches the bytes; this crate

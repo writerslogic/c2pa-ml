@@ -3,14 +3,19 @@
 //! An ONNX model is a protobuf-encoded `ModelProto`. Its `metadata_props` field
 //! (field number 14, a repeated `StringStringEntryProto`) is the model's
 //! key/value metadata slot. A C2PA Manifest Store is embedded as a
-//! `metadata_props` entry under `c2pa.manifest` as Base64 (the values are
-//! protobuf strings); a remote manifest URI is stored under `c2pa.manifest.uri`.
+//! `metadata_props` entry under `c2pa:manifest` as Base64 (the values are
+//! protobuf strings); a remote manifest URI is stored under `c2pa:manifest.uri`.
+//!
+//! Only one `c2pa:manifest` entry shall be present; more than one is rejected
+//! with `manifest.onnx.multipleManifests`. The hard binding excludes the Base64
+//! value bytes only — see [`crate::binding`].
 //!
 //! Embedding rewrites only the top-level field stream — every other field
 //! (`ir_version`, `graph`, `opset_import`, …) is copied through verbatim.
 
 use crate::base64;
 use crate::error::Error;
+use crate::format::Format;
 use crate::manifest::{ManifestSource, STORE_KEY, URI_KEY};
 
 const F_METADATA_PROPS: u64 = 14;
@@ -54,9 +59,12 @@ pub fn embed(data: &[u8], source: &ManifestSource) -> Result<Vec<u8>, Error> {
 
 /// Read the embedded C2PA Manifest Store from an ONNX model.
 pub fn read_store(data: &[u8]) -> Result<Vec<u8>, Error> {
-    let b64 = read_entry(data, STORE_KEY)?.ok_or(Error::NotFound)?;
-    let text = String::from_utf8(b64).map_err(|_| Error::Malformed("store is not UTF-8".into()))?;
-    base64::decode(&text).map_err(|e| Error::MalformedReference(e.to_string()))
+    // Via the span so the "only one entry" rule is enforced on every read, not
+    // just when a binding is computed.
+    let span = store_value_span(data)?;
+    let text = std::str::from_utf8(&data[span])
+        .map_err(|_| Error::Malformed("store is not UTF-8".into()))?;
+    base64::decode(text).map_err(|e| Error::MalformedReference(e.to_string()))
 }
 
 /// Read the remote manifest URI from an ONNX model, if present.
@@ -156,6 +164,52 @@ fn entry_is_c2pa(msg: &[u8]) -> Result<bool, Error> {
     Ok(key == STORE_KEY.as_bytes() || key == URI_KEY.as_bytes())
 }
 
+/// The byte range of a `metadata_props` entry's `value` payload within `data`,
+/// for every entry whose `key` matches.
+///
+/// Offsets are absolute in the serialized `ModelProto`, which is what the
+/// exclusion range is defined against. `parse_entry` copies the value out and so
+/// cannot answer this.
+fn entry_value_spans(data: &[u8], key: &str) -> Result<Vec<std::ops::Range<usize>>, Error> {
+    let mut out = Vec::new();
+    for f in scan_fields(data)? {
+        if f.number != F_METADATA_PROPS {
+            continue;
+        }
+        let base = f.payload.start;
+        let msg = &data[f.payload.clone()];
+        let (mut k, mut v) = (None, None);
+        for inner in scan_fields(msg)? {
+            // `inner.payload` is relative to `msg`; shift it back into `data`.
+            let span = base + inner.payload.start..base + inner.payload.end;
+            if inner.number == F_KEY {
+                k = Some(span);
+            } else if inner.number == F_VALUE {
+                v = Some(span);
+            }
+        }
+        if let (Some(k), Some(v)) = (k, v) {
+            if &data[k] == key.as_bytes() {
+                out.push(v);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// The byte range of the Base64-encoded Manifest Store value within the
+/// serialized `ModelProto`.
+///
+/// This is the single exclusion range the `c2pa.hash.data` assertion carries.
+pub(crate) fn store_value_span(data: &[u8]) -> Result<std::ops::Range<usize>, Error> {
+    let mut spans = entry_value_spans(data, STORE_KEY)?;
+    match spans.len() {
+        0 => Err(Error::NotFound),
+        1 => Ok(spans.pop().expect("length checked above")),
+        _ => Err(Error::MultipleManifests(Format::Onnx)),
+    }
+}
+
 fn read_entry(data: &[u8], key: &str) -> Result<Option<Vec<u8>>, Error> {
     for f in scan_fields(data)? {
         if f.number == F_METADATA_PROPS {
@@ -226,7 +280,7 @@ pub(crate) mod tests {
     /// `producer_name = "demo"` (field 2).
     pub fn sample_onnx() -> Vec<u8> {
         let mut out = Vec::new();
-        write_varint(&mut out, (1 << 3) | 0); // ir_version, varint
+        write_varint(&mut out, 1 << 3); // ir_version, wire type 0 (varint)
         write_varint(&mut out, 9);
         encode_string_field(&mut out, 2, b"demo"); // producer_name
         out
@@ -295,5 +349,35 @@ pub(crate) mod tests {
             embed(&sample_onnx(), &ManifestSource::default()),
             Err(Error::EmptySource)
         ));
+    }
+
+    #[test]
+    fn the_store_key_is_colon_namespaced_on_the_wire() {
+        // The specification names `c2pa:manifest`. A dot here would embed into a
+        // key no other implementation reads.
+        let out = embed(&sample_onnx(), &ManifestSource::embedded(vec![1])).unwrap();
+        assert!(out.windows(13).any(|w| w == b"c2pa:manifest"));
+        assert!(!out.windows(13).any(|w| w == b"c2pa.manifest"));
+    }
+
+    #[test]
+    fn more_than_one_manifest_entry_is_rejected() {
+        let mut model = embed(&sample_onnx(), &ManifestSource::embedded(vec![1])).unwrap();
+        // A second entry under the same key, as a foreign writer might produce.
+        model.extend_from_slice(&encode_entry(STORE_KEY, b"aGk="));
+
+        for result in [read_store(&model).err(), store_value_span(&model).err()] {
+            let err = result.expect("a second entry must be rejected");
+            assert!(matches!(err, Error::MultipleManifests(Format::Onnx)));
+            assert_eq!(err.code(), Some("manifest.onnx.multipleManifests"));
+        }
+    }
+
+    #[test]
+    fn the_value_span_points_at_the_base64_bytes() {
+        let store = vec![9u8, 8, 7, 6, 5];
+        let model = embed(&sample_onnx(), &ManifestSource::embedded(store.clone())).unwrap();
+        let span = store_value_span(&model).unwrap();
+        assert_eq!(&model[span], base64::encode(&store).as_bytes());
     }
 }

@@ -8,15 +8,15 @@
 //! format's own metadata slot, so the model stays loadable by its usual
 //! runtime:
 //!
-//! - **GGUF** (llama.cpp) — a `c2pa.manifest` key/value metadata entry
+//! - **GGUF** (llama.cpp) — a `c2pa:manifest` key/value metadata entry
 //!   ([`gguf`]).
-//! - **SafeTensors** — a `c2pa.manifest` entry in the JSON header's
+//! - **SafeTensors** — a `c2pa:manifest` entry in the JSON header's
 //!   `__metadata__` ([`safetensors`]).
-//! - **ONNX** — a `c2pa.manifest` entry in the protobuf `metadata_props`
+//! - **ONNX** — a `c2pa:manifest` entry in the protobuf `metadata_props`
 //!   ([`onnx`]).
 //!
 //! A remote (or side-car) manifest can instead be referenced by URI under
-//! `c2pa.manifest.uri`, or both an embedded store and a URI can be written
+//! `c2pa:manifest.uri`, or both an embedded store and a URI can be written
 //! together (see [`ManifestSource`]).
 //!
 //! The top-level functions auto-detect the format:
@@ -51,8 +51,10 @@
 
 mod base64;
 mod json;
+mod sha2;
 
 pub mod asset_type;
+pub mod binding;
 pub mod gguf;
 pub mod onnx;
 pub mod safetensors;
