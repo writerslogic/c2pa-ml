@@ -60,7 +60,8 @@ pub fn read_store(data: &[u8]) -> Result<Vec<u8>, Error> {
     let span = store_value_span(data)?;
     let b64 = std::str::from_utf8(&data[span])
         .map_err(|_| Error::Malformed("store is not UTF-8".into()))?;
-    base64::decode(b64).map_err(|e| Error::MalformedReference(e.to_string()))
+    base64::decode(b64.as_bytes())
+        .ok_or_else(|| Error::MalformedReference("value is not valid Base64".into()))
 }
 
 /// Read the remote manifest URI from a SafeTensors file, if present.

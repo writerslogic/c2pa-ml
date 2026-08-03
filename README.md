@@ -13,15 +13,19 @@
 
 Associates a C2PA Manifest Store with an AI/ML model by writing it into the model container's own metadata slot, so the model stays loadable by its usual runtime. Three formats are supported:
 
-| Format | Metadata slot | Manifest encoding |
-|---|---|---|
-| **GGUF** (llama.cpp) | typed key/value metadata | `c2pa:manifest` as a `UINT8` array (raw bytes) |
-| **SafeTensors** | JSON header `__metadata__` | `c2pa:manifest` as Base64 |
-| **ONNX** | protobuf `metadata_props` | `c2pa:manifest` as Base64 |
+| Format | Metadata slot | Manifest encoding | Specified? |
+|---|---|---|---|
+| **ONNX** | protobuf `metadata_props` | `c2pa:manifest` as Base64 | yes |
+| **SafeTensors** | JSON header `__metadata__` | `c2pa:manifest` as Base64 | yes |
+| **GGUF** (llama.cpp) | typed key/value metadata | `c2pa:manifest` as a `UINT8` array (raw bytes) | **no** |
 
-A remote (or side-car) manifest can instead be referenced by URI under `c2pa:manifest.uri`, or both an embedded store and a URI can be written together.
+ONNX and SafeTensors each have a normative clause in the [C2PA Technical Specification](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html), including the `c2pa:manifest` key, the hard binding, and a per-format `multipleManifests` failure code. This crate implements them as written.
 
-The [C2PA Technical Specification](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html) defines no dedicated embedding method for model containers; a manifest embedded in a model declares what the asset is with the [asset type assertion](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html#_asset_type). This crate provides the canonical `c2pa.types.model.*` strings for that assertion.
+**GGUF has no specified embedding method.** It is supported here as a crate extension, following the same shape so a dispatcher can treat all three alike — but there is no specified exclusion range for it, so [`binding::manifest_exclusion`](https://docs.rs/c2pa-ml) declines to invent one and returns `UnknownFormat`. Embedding and reading work; only the hard binding is unavailable.
+
+A remote (or side-car) manifest can instead be referenced by URI under `c2pa:manifest.uri`, or both an embedded store and a URI can be written together. The specification defines no remote-URI key for these formats, so that too is a crate extension, namespaced to match.
+
+A manifest embedded in a model should also declare what the asset is with the [asset type assertion](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html#_asset_type); this crate provides the canonical `c2pa.types.model.*` strings for that.
 
 Zero dependencies on native targets; the WebAssembly/npm build uses only `wasm-bindgen`.
 
