@@ -22,7 +22,7 @@ python = ["dep:pyo3"]
 
 # The PyPI distribution enables the `python` feature; native builds without it
 # stay dependency-free.
-pyo3 = { version = "0.23", optional = true, features = ["extension-module", "abi3-py39"] }
+pyo3 = { version = "0.29", optional = true, features = ["extension-module", "abi3-py39"] }
 
 # The npm distribution is a `wasm32` build; native targets stay dependency-free.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
