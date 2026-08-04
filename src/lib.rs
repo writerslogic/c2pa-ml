@@ -49,6 +49,8 @@
 //! Zero dependencies on native targets; the WebAssembly/npm build uses only
 //! `wasm-bindgen`.
 
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 mod base64;
 mod json;
 mod sha2;

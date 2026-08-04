@@ -27,3 +27,8 @@ pyo3 = { version = "0.23", optional = true, features = ["extension-module", "abi
 # The npm distribution is a `wasm32` build; native targets stay dependency-free.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
+
+# docs.rs renders optional features only when told to; without this the
+# feature-gated API is invisible on the crate's docs page.
+[package.metadata.docs.rs]
+all-features = true

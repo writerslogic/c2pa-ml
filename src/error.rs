@@ -30,6 +30,7 @@ pub enum Error {
     HashMismatch,
     /// A hash algorithm identifier outside the C2PA allowed list was requested.
     UnsupportedAlgorithm(String),
+    /// An underlying I/O failure.
     Io(std::io::Error),
 }
 

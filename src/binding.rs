@@ -47,7 +47,9 @@ pub const DATA_HASH_LABEL: &str = "c2pa.hash.data";
 /// CDDL (`start`, `length`). Offsets are into the file as stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Exclusion {
+    /// Byte offset of the first excluded byte.
     pub start: usize,
+    /// Number of bytes excluded.
     pub length: usize,
 }
 
@@ -60,8 +62,11 @@ impl Exclusion {
 /// A C2PA-allowed hash algorithm for the data hash.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Algorithm {
+    /// SHA-256, the C2PA `sha256` identifier.
     Sha256,
+    /// SHA-384, the C2PA `sha384` identifier.
     Sha384,
+    /// SHA-512, the C2PA `sha512` identifier.
     Sha512,
 }
 
@@ -75,6 +80,8 @@ impl Algorithm {
         }
     }
 
+    /// Parse a C2PA algorithm identifier, rejecting any outside the allowed
+    /// list.
     pub fn from_id(id: &str) -> Result<Self, Error> {
         match id {
             "sha256" => Ok(Algorithm::Sha256),
@@ -92,6 +99,7 @@ impl Algorithm {
 /// Model files run to gigabytes, so substituting here is not a theoretical
 /// concern: the built-in implementation is portable, not vectorized.
 pub trait Hasher {
+    /// Digest `data` with `alg`, returning the raw hash bytes.
     fn digest(&self, alg: Algorithm, data: &[u8]) -> Vec<u8>;
 }
 
@@ -113,9 +121,13 @@ impl Hasher for Sha2 {
 /// A computed `c2pa.hash.data` assertion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataHash {
+    /// Byte ranges excluded from the hash, in ascending order.
     pub exclusions: Vec<Exclusion>,
+    /// The hash algorithm identifier, e.g. `sha256`.
     pub alg: String,
+    /// The computed digest.
     pub hash: Vec<u8>,
+    /// Optional human-readable name for the assertion.
     pub name: Option<String>,
 }
 
