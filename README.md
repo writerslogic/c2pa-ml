@@ -1,3 +1,7 @@
+# c2pa-ml
+
+_C2PA manifest embedding for AI/ML model container formats: GGUF, SafeTensors, and ONNX._
+
 <p align="center">
   <h1 align="center">c2pa-ml</h1>
   <p align="center">C2PA manifest embedding for AI/ML model container formats: GGUF, SafeTensors, and ONNX</p>
@@ -33,7 +37,7 @@ Zero dependencies on native targets; the WebAssembly/npm build uses only `wasm-b
 
 ```toml
 [dependencies]
-c2pa-ml = "0.1"
+c2pa-ml = "0.2"
 ```
 
 ### Embed a manifest
