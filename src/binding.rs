@@ -127,6 +127,9 @@ pub struct DataHash {
     pub alg: String,
     /// The computed digest.
     pub hash: Vec<u8>,
+    /// Padding bytes reserved by the claim generator. The CDDL requires this
+    /// field even when no padding is needed.
+    pub pad: Vec<u8>,
     /// Optional human-readable name for the assertion.
     pub name: Option<String>,
 }
@@ -146,10 +149,11 @@ impl DataHash {
             .map(|e| format!("{{\"start\":{},\"length\":{}}}", e.start, e.length))
             .collect();
         let mut json = format!(
-            "{{\"exclusions\":[{}],\"alg\":\"{}\",\"hash\":\"{}\"",
+            "{{\"exclusions\":[{}],\"alg\":\"{}\",\"hash\":\"{}\",\"pad\":\"{}\"",
             ranges.join(","),
             self.alg,
-            base64::encode(&self.hash)
+            base64::encode(&self.hash),
+            base64::encode(&self.pad)
         );
         if let Some(name) = &self.name {
             json.push_str(&format!(",\"name\":\"{name}\""));
@@ -214,6 +218,7 @@ pub fn compute_data_hash(
         exclusions: vec![exclusion],
         alg: alg.id().to_string(),
         hash: hasher.digest(alg, &covered),
+        pad: Vec::new(),
         name: None,
     })
 }
@@ -231,9 +236,9 @@ pub fn verify_data_hash(
 ) -> Result<(), Error> {
     let alg = Algorithm::from_id(&data_hash.alg)?;
     let located = manifest_exclusion(data)?;
-    if !data_hash.exclusions.contains(&located) {
+    if data_hash.exclusions != [located] {
         return Err(Error::MalformedExclusion(
-            "assertion does not exclude the located manifest value".into(),
+            "assertion must exclude only the located manifest value".into(),
         ));
     }
     let covered = apply_exclusions(data, &data_hash.exclusions)?;
@@ -414,6 +419,20 @@ mod tests {
     }
 
     #[test]
+    fn an_additional_exclusion_is_rejected() {
+        let data = embedded(&sample_onnx(), STORE);
+        let mut dh = compute_data_hash(&data, Algorithm::Sha256, &Sha2).unwrap();
+        dh.exclusions.push(Exclusion {
+            start: data.len() - 1,
+            length: 1,
+        });
+        assert!(matches!(
+            verify_data_hash(&data, &dh, &Sha2),
+            Err(Error::MalformedExclusion(_))
+        ));
+    }
+
+    #[test]
     fn malformed_ranges_are_rejected() {
         let data = embedded(&sample_onnx(), STORE);
         let out_of_order = [
@@ -509,11 +528,12 @@ mod tests {
             }],
             alg: "sha256".into(),
             hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            pad: Vec::new(),
             name: None,
         };
         assert_eq!(
             dh.to_json(),
-            r#"{"exclusions":[{"start":73,"length":114}],"alg":"sha256","hash":"3q2+7w=="}"#
+            r#"{"exclusions":[{"start":73,"length":114}],"alg":"sha256","hash":"3q2+7w==","pad":""}"#
         );
     }
 }
