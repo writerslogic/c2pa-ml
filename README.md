@@ -1,16 +1,23 @@
-# c2pa-ml
+<!-- repo-header:start -->
+<img src="https://github.com/writerslogic.png?size=160" alt="c2pa-ml logo" width="120" align="left">
 
-_C2PA manifest embedding for AI/ML model container formats: GGUF, SafeTensors, and ONNX._
+<h1>c2pa-ml</h1>
 
-<p align="center">
-  <h1 align="center">c2pa-ml</h1>
+<p><strong>Project documentation and resources for C2PA ML.</strong></p>
+
+<br clear="left">
+
+[![CI](https://img.shields.io/github/actions/workflow/status/writerslogic/c2pa-ml/ci.yml?style=flat-square&labelColor=20232a&branch=main&label=CI)](https://github.com/writerslogic/c2pa-ml/actions/workflows/ci.yml) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14413/badge)](https://www.bestpractices.dev/projects/14413) [![License](https://img.shields.io/github/license/writerslogic/c2pa-ml?style=flat-square&labelColor=20232a&color=007ec6&label=license)](https://github.com/writerslogic/c2pa-ml/blob/main/LICENSE-APACHE) [![Code of Conduct](https://img.shields.io/badge/code%20of%20conduct-Contributor%20Covenant%202.1-6a4c93?style=flat-square&labelColor=20232a)](https://github.com/writerslogic/c2pa-ml/blob/main/CODE_OF_CONDUCT.md) [![C2PA](https://img.shields.io/badge/standard-C2PA%20related-6a4c93?style=flat-square&labelColor=20232a)](https://c2pa.org/) [![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Sponsor-EA4AAA?style=flat-square&labelColor=20232a)](https://github.com/sponsors/dcondrey)
+<!-- repo-header:end -->
+
+<h1 align="center">c2pa-ml</h1>
   <p align="center">C2PA manifest embedding for AI/ML model container formats: GGUF, SafeTensors, and ONNX</p>
 </p>
 
 <p align="center">
-  <a href="https://crates.io/crates/c2pa-ml"><img src="https://img.shields.io/crates/v/c2pa-ml.svg" alt="crates.io"></a>
-  <a href="https://docs.rs/c2pa-ml"><img src="https://docs.rs/c2pa-ml/badge.svg" alt="docs.rs"></a>
-  <a href="#license"><img src="https://img.shields.io/crates/l/c2pa-ml.svg" alt="License"></a>
+  <a href="https://crates.io/crates/c2pa-ml"><img src="https://img.shields.io/crates/v/c2pa-ml.svg?style=flat-square&labelColor=20232a&color=007ec6" alt="crates.io"></a>
+  <a href="https://docs.rs/c2pa-ml"><img src="https://img.shields.io/docsrs/c2pa-ml?style=flat-square&labelColor=20232a&color=007ec6" alt="docs.rs"></a>
+  <a href="#license"><img src="https://img.shields.io/crates/l/c2pa-ml.svg?style=flat-square&labelColor=20232a&color=007ec6" alt="License"></a>
 </p>
 
 ## Overview
