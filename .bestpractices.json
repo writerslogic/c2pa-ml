@@ -12,7 +12,7 @@
   "floss_license_osi_status": "Met",
   "floss_license_osi_justification": "Both MIT and Apache License 2.0 are OSI-approved licenses (https://opensource.org/licenses/MIT, https://opensource.org/licenses/Apache-2.0). GitHub's own license detection on the repo also reports Apache-2.0 (spdx_id 'Apache-2.0' via `gh api repos/writerslogic/c2pa-ml`).",
   "license_location_status": "Met",
-  "license_location_justification": "LICENSE-APACHE and LICENSE-MIT exist at repo root (/Volumes/A/c2pa-ml/LICENSE-APACHE, /Volumes/A/c2pa-ml/LICENSE-MIT), the standard location, and README.md's License section links to both.",
+  "license_location_justification": "LICENSE-APACHE and LICENSE-MIT hold the full texts (dual MIT OR Apache-2.0 per Cargo.toml); a top-level LICENSE file (identical to LICENSE-APACHE) is also present at the repository root for tooling that only recognizes that exact filename.",
   "documentation_basics_status": "Met",
   "documentation_basics_justification": "README.md documents installation (crates.io/npm/PyPI), Quick Start usage examples for embed/read/verify/detect, and a Design section explaining per-format behavior. docs.rs badge links to generated API docs (Cargo.toml has [package.metadata.docs.rs] all-features = true).",
   "documentation_interface_status": "Met",
