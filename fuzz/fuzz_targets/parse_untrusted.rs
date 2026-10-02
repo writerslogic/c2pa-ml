@@ -1,0 +1,9 @@
+#![no_main]
+
+use c2pa_ml::{read_manifest, read_manifest_uri};
+use libfuzzer_sys::fuzz_target;
+
+fuzz_target!(|data: &[u8]| {
+    let _ = read_manifest(data);
+    let _ = read_manifest_uri(data);
+});
