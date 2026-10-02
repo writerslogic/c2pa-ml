@@ -67,6 +67,7 @@ pub(crate) fn parse(input: &str) -> Result<Value, String> {
     let mut p = Parser {
         bytes: input.as_bytes(),
         pos: 0,
+        depth: 0,
     };
     p.skip_ws();
     let value = p.parse_value()?;
@@ -137,7 +138,14 @@ fn write_string(out: &mut String, s: &str) {
 struct Parser<'a> {
     bytes: &'a [u8],
     pos: usize,
+    depth: u32,
 }
+
+/// Object/array nesting depth an adversarial header can force the parser to recurse
+/// through (parse_value -> parse_array/parse_object -> parse_value -> ...) before it
+/// gives up. Left unbounded, a header with enough nested `[`/`{` stack-overflows and
+/// aborts the process -- an abort that isn't a catchable `Result`/panic.
+const MAX_JSON_DEPTH: u32 = 64;
 
 impl Parser<'_> {
     fn skip_ws(&mut self) {
@@ -268,6 +276,16 @@ impl Parser<'_> {
     }
 
     fn parse_array(&mut self) -> Result<Value, String> {
+        self.depth += 1;
+        if self.depth > MAX_JSON_DEPTH {
+            return Err(format!("nesting too deep at {}", self.pos));
+        }
+        let result = self.parse_array_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn parse_array_inner(&mut self) -> Result<Value, String> {
         self.pos += 1;
         let mut items = Vec::new();
         self.skip_ws();
@@ -291,6 +309,16 @@ impl Parser<'_> {
     }
 
     fn parse_object(&mut self) -> Result<Value, String> {
+        self.depth += 1;
+        if self.depth > MAX_JSON_DEPTH {
+            return Err(format!("nesting too deep at {}", self.pos));
+        }
+        let result = self.parse_object_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn parse_object_inner(&mut self) -> Result<Value, String> {
         self.pos += 1;
         let mut entries: Vec<(String, Value)> = Vec::new();
         self.skip_ws();
@@ -340,6 +368,14 @@ mod tests {
     fn preserves_number_text() {
         let v = parse("[0,16,1024]").unwrap();
         assert_eq!(to_string(&v), "[0,16,1024]");
+    }
+
+    /// A header with enough nested arrays must error, not recurse until the process
+    /// stack-overflows and aborts.
+    #[test]
+    fn deeply_nested_array_errors_instead_of_overflowing_the_stack() {
+        let src = format!("{}{}", "[".repeat(10_000), "]".repeat(10_000));
+        assert!(parse(&src).is_err());
     }
 
     #[test]
