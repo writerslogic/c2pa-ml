@@ -109,7 +109,13 @@ impl<'a> Gguf<'a> {
         let tensor_count = c.u64()?;
         let kv_count = c.u64()?;
 
-        let mut kvs = Vec::with_capacity(kv_count as usize);
+        // `kv_count` is an attacker-controlled u64 read straight off the wire; reserving
+        // that much capacity up front (e.g. u64::MAX) aborts the process via a capacity
+        // overflow or allocator failure before a single entry is validated. Grow
+        // incrementally instead -- each push is bounded by what the loop below actually
+        // manages to parse out of the real input, which the cursor's own bounds checks
+        // already limit to the file's real size.
+        let mut kvs = Vec::new();
         let mut alignment = DEFAULT_ALIGNMENT;
         for _ in 0..kv_count {
             let key = c.gguf_string()?;
@@ -277,7 +283,21 @@ impl<'a> Cursor<'a> {
             .map_err(|_| Error::Malformed("metadata key is not UTF-8".into()))
     }
 
+    /// Nested arrays recurse through this function one level per level of nesting.
+    /// Depth is attacker-controlled (it comes from the element type an adversarial
+    /// file declares for each array), so it's bounded here rather than left to grow
+    /// until the process stack-overflows and aborts -- an abort that isn't a catchable
+    /// `Result`/panic and would otherwise crash the whole host process.
+    const MAX_ARRAY_DEPTH: u32 = 64;
+
     fn skip_value(&mut self, vtype: u32) -> Result<(), Error> {
+        self.skip_value_at_depth(vtype, 0)
+    }
+
+    fn skip_value_at_depth(&mut self, vtype: u32, depth: u32) -> Result<(), Error> {
+        if depth > Self::MAX_ARRAY_DEPTH {
+            return Err(Error::Malformed("GGUF array nesting too deep".into()));
+        }
         match vtype {
             T_STRING => {
                 let len = self.u64()? as usize;
@@ -287,7 +307,7 @@ impl<'a> Cursor<'a> {
                 let elem = self.u32()?;
                 let count = self.u64()?;
                 for _ in 0..count {
-                    self.skip_value(elem)?;
+                    self.skip_value_at_depth(elem, depth + 1)?;
                 }
             }
             t => {
@@ -416,5 +436,42 @@ pub(crate) mod tests {
         assert_eq!(parsed.alignment, 16);
         let embedded = embed(&out, &ManifestSource::embedded(vec![7])).unwrap();
         assert_eq!(read_store(&embedded).unwrap(), vec![7]);
+    }
+
+    /// A tiny file declaring an implausibly large `kv_count` must error, not abort the
+    /// process by over-reserving a `Vec`'s capacity from an unvalidated attacker u64.
+    #[test]
+    fn huge_kv_count_errors_instead_of_aborting() {
+        let mut out = Vec::new();
+        out.extend_from_slice(MAGIC);
+        out.extend_from_slice(&3u32.to_le_bytes()); // version
+        out.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
+        out.extend_from_slice(&u64::MAX.to_le_bytes()); // kv_count: implausible
+        assert!(Gguf::parse(&out).is_err());
+    }
+
+    /// Deeply nested arrays must be rejected once past the depth limit, not recurse
+    /// until the process stack-overflows and aborts.
+    #[test]
+    fn deeply_nested_array_errors_instead_of_overflowing_the_stack() {
+        let mut out = Vec::new();
+        out.extend_from_slice(MAGIC);
+        out.extend_from_slice(&3u32.to_le_bytes()); // version
+        out.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
+        out.extend_from_slice(&1u64.to_le_bytes()); // kv_count
+        let key = b"k";
+        out.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        out.extend_from_slice(key);
+        out.extend_from_slice(&T_ARRAY.to_le_bytes());
+        // 200 levels of "array of array of ... of one UINT8", each level an
+        // array of exactly one element so the file stays small.
+        for _ in 0..200 {
+            out.extend_from_slice(&T_ARRAY.to_le_bytes());
+            out.extend_from_slice(&1u64.to_le_bytes());
+        }
+        out.extend_from_slice(&T_UINT8.to_le_bytes());
+        out.extend_from_slice(&1u64.to_le_bytes());
+        out.push(0u8);
+        assert!(Gguf::parse(&out).is_err());
     }
 }
