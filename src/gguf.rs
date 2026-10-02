@@ -203,7 +203,13 @@ fn decode_u8_array(value: &[u8]) -> Result<Vec<u8>, Error> {
             "c2pa:manifest is not a UINT8 array".into(),
         ));
     }
-    let count = c.u64()? as usize;
+    // `as usize` would silently truncate an attacker-controlled u64 on a
+    // 32-bit target (wasm32) rather than erroring, creating a native/wasm
+    // parsing differential: the same file reads a different byte count on
+    // each target. `take`'s own bounds check only protects against reading
+    // too much, not against reading the wrong (truncated) amount.
+    let count =
+        usize::try_from(c.u64()?).map_err(|_| Error::Malformed("array too large".into()))?;
     Ok(c.take(count)?.to_vec())
 }
 
@@ -220,7 +226,7 @@ fn decode_string(value: &[u8]) -> Result<String, Error> {
     if c.u32()? != T_STRING {
         return Err(Error::Malformed("c2pa:manifest.uri is not a string".into()));
     }
-    let len = c.u64()? as usize;
+    let len = usize::try_from(c.u64()?).map_err(|_| Error::Malformed("string too large".into()))?;
     let bytes = c.take(len)?;
     String::from_utf8(bytes.to_vec()).map_err(|_| Error::Malformed("URI is not UTF-8".into()))
 }
@@ -277,7 +283,8 @@ impl<'a> Cursor<'a> {
     }
 
     fn gguf_string(&mut self) -> Result<String, Error> {
-        let len = self.u64()? as usize;
+        let len = usize::try_from(self.u64()?)
+            .map_err(|_| Error::Malformed("string too large".into()))?;
         let bytes = self.take(len)?;
         String::from_utf8(bytes.to_vec())
             .map_err(|_| Error::Malformed("metadata key is not UTF-8".into()))
@@ -300,7 +307,8 @@ impl<'a> Cursor<'a> {
         }
         match vtype {
             T_STRING => {
-                let len = self.u64()? as usize;
+                let len = usize::try_from(self.u64()?)
+                    .map_err(|_| Error::Malformed("string too large".into()))?;
                 self.take(len)?;
             }
             T_ARRAY => {
