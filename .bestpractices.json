@@ -125,12 +125,12 @@
   "static_analysis_fixed_justification": "CI enforces `cargo clippy -- -D warnings`, so any static-analysis finding blocks merge until fixed (.github/workflows/ci.yml 'check' job and release.yml 'verify' job).",
   "static_analysis_often_status": "Met",
   "static_analysis_often_justification": "clippy runs on every push to main and every pull request (.github/workflows/ci.yml, triggers: push to main, pull_request to main), i.e. on every commit reaching those refs.",
-  "dynamic_analysis_status": "Unmet",
-  "dynamic_analysis_justification": "No dynamic analysis tool (e.g. fuzzing via cargo-fuzz, or a sanitizer run) was found in .github/workflows/ or elsewhere in the repo; only static clippy checks and cargo test are run.",
+  "dynamic_analysis_status": "Met",
+  "dynamic_analysis_justification": "A cargo-fuzz target (fuzz/fuzz_targets/parse_untrusted.rs) drives the crate's untrusted-input parsers with libFuzzer; fuzz/README.md documents how to run it.",
   "dynamic_analysis_unsafe_status": "N/A",
   "dynamic_analysis_unsafe_justification": "No `unsafe` memory-unsafe code was found in a manual review of src/*.rs during this audit (the crate is safe-Rust parsing/rewriting of binary formats); this is standard-Rust code without C/C++ memory-unsafety concerns, so no memory-safety dynamic tool is required.",
-  "dynamic_analysis_enable_assertions_status": "Unmet",
-  "dynamic_analysis_enable_assertions_justification": "No dynamic-analysis configuration exists in this repo (see dynamic_analysis above), so there is no assertion-enabling config to evaluate.",
+  "dynamic_analysis_enable_assertions_status": "Met",
+  "dynamic_analysis_enable_assertions_justification": "The fuzz target builds with cargo-fuzz's default dev profile, which enables debug assertions and overflow checks, so Rust's integer-overflow and bounds checks act as assertions during fuzzing.",
   "dynamic_analysis_fixed_status": "N/A",
   "dynamic_analysis_fixed_justification": "No dynamic-analysis tool is currently run against this project (see dynamic_analysis above), so there are no dynamic-analysis findings to have fixed."
 }
