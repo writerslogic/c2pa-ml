@@ -118,10 +118,10 @@ fn metadata_value_spans(header: &[u8], key: &str) -> Vec<Range<usize>> {
     while i < header.len() {
         match header[i] {
             b'{' => {
-                if pending
-                    .as_ref()
-                    .is_some_and(|k| &header[k.clone()] == METADATA_KEY.as_bytes())
-                {
+                if pending.as_ref().is_some_and(|k| {
+                    decode_json_string_escapes(&header[k.clone()])
+                        .is_some_and(|decoded| decoded == METADATA_KEY)
+                }) {
                     meta_depth = Some(stack.len() + 1);
                 }
                 stack.push(true);
@@ -163,9 +163,10 @@ fn metadata_value_spans(header: &[u8], key: &str) -> Vec<Range<usize>> {
                     expect_key = false;
                 } else {
                     if meta_depth == Some(stack.len())
-                        && pending
-                            .as_ref()
-                            .is_some_and(|k| &header[k.clone()] == key.as_bytes())
+                        && pending.as_ref().is_some_and(|k| {
+                            decode_json_string_escapes(&header[k.clone()])
+                                .is_some_and(|decoded| decoded == key)
+                        })
                     {
                         out.push(content);
                     }
@@ -177,6 +178,66 @@ fn metadata_value_spans(header: &[u8], key: &str) -> Vec<Range<usize>> {
         }
     }
     out
+}
+
+/// Decode a JSON string's raw content bytes (as captured by [`scan_string`],
+/// quotes already stripped) into the string it actually denotes.
+///
+/// `scan_string` finds a key's byte span correctly, but comparing those raw
+/// bytes against a plain-ASCII target key (as this scanner used to) misses
+/// that two different escaped spellings can denote the same string --
+/// `"c2pa:manifest"` and `"c2pa:manifest"` both mean the same JSON string
+/// key but have different raw bytes. Decoding before comparing closes that
+/// gap: a header with both spellings present is correctly seen as the same
+/// key appearing twice, triggering `MultipleManifests` instead of silently
+/// picking one.
+fn decode_json_string_escapes(bytes: &[u8]) -> Option<String> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next()? {
+            '"' => out.push('"'),
+            '\\' => out.push('\\'),
+            '/' => out.push('/'),
+            'n' => out.push('\n'),
+            'r' => out.push('\r'),
+            't' => out.push('\t'),
+            'b' => out.push('\u{08}'),
+            'f' => out.push('\u{0C}'),
+            'u' => {
+                let hex: String = (&mut chars).take(4).collect();
+                if hex.len() != 4 {
+                    return None;
+                }
+                let cp = u32::from_str_radix(&hex, 16).ok()?;
+                if (0xD800..=0xDBFF).contains(&cp) {
+                    // High surrogate: require a following \uXXXX low surrogate.
+                    if chars.next() != Some('\\') || chars.next() != Some('u') {
+                        return None;
+                    }
+                    let lo_hex: String = (&mut chars).take(4).collect();
+                    if lo_hex.len() != 4 {
+                        return None;
+                    }
+                    let lo = u32::from_str_radix(&lo_hex, 16).ok()?;
+                    if !(0xDC00..=0xDFFF).contains(&lo) {
+                        return None;
+                    }
+                    let c = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                    out.push(char::from_u32(c)?);
+                } else {
+                    out.push(char::from_u32(cp)?);
+                }
+            }
+            _ => return None,
+        }
+    }
+    Some(out)
 }
 
 /// Given the index of an opening quote, the span of the string's content and the
@@ -237,9 +298,15 @@ fn header_bounds(data: &[u8]) -> Result<(usize, usize), Error> {
             "file shorter than SafeTensors header".into(),
         ));
     }
-    let n = u64::from_le_bytes([
+    let n_u64 = u64::from_le_bytes([
         data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
-    ]) as usize;
+    ]);
+    // `as usize` would silently truncate on a 32-bit target (wasm32) instead
+    // of erroring, letting a declared length like 0x1_0000_0005 parse as 5
+    // there while failing bounds-checking on a 64-bit native build -- the
+    // same file would be accepted on one target and rejected on another.
+    let n = usize::try_from(n_u64)
+        .map_err(|_| Error::Malformed("header length exceeds file".into()))?;
     let end = 8usize
         .checked_add(n)
         .filter(|&e| e <= data.len())
@@ -433,6 +500,25 @@ pub(crate) mod tests {
             let err = result.expect("a duplicate key must be rejected");
             assert!(matches!(err, Error::MultipleManifests(Format::SafeTensors)));
             assert_eq!(err.code(), Some("manifest.safetensors.multipleManifests"));
+        }
+    }
+
+    /// Two differently-escaped JSON keys that decode to the same string must
+    /// be recognised as the same key appearing twice, not as one real
+    /// manifest key plus one unrelated one. Comparing raw (still-escaped)
+    /// bytes against a plain-ASCII target missed this.
+    #[test]
+    fn a_key_disguised_with_a_unicode_escape_is_still_a_duplicate() {
+        let header = r#"{"__metadata__":{"c2pa:manifest":"aGk=","c2pa:manifest":"Qg=="},"t":{"dtype":"F32","shape":[2],"data_offsets":[0,8]}}"#;
+        let mut file = (header.len() as u64).to_le_bytes().to_vec();
+        file.extend_from_slice(header.as_bytes());
+        file.extend_from_slice(&[0u8; 8]);
+
+        for result in [read_store(&file).err(), store_value_span(&file).err()] {
+            assert!(matches!(
+                result.expect("an escape-disguised duplicate key must be rejected"),
+                Error::MultipleManifests(Format::SafeTensors)
+            ));
         }
     }
 

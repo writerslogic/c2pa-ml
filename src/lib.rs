@@ -40,11 +40,11 @@
 //!
 //! # Scope
 //!
-//! This crate implements embedding and extraction only. Manifest construction,
-//! signing, and content (hard/soft) binding are out of scope; use the
+//! This crate implements embedding, extraction, and the `c2pa.hash.data` hard
+//! binding (see [`binding`]) for all three formats. Manifest construction,
+//! signing, soft binding, and trust validation are out of scope; use the
 //! [official C2PA SDK](https://crates.io/crates/c2pa) to build and sign
-//! manifests. The `c2pa.hash.data` assertion should exclude the metadata region
-//! carrying the Manifest Store.
+//! manifests.
 //!
 //! Zero dependencies on native targets; the WebAssembly/npm build uses only
 //! `wasm-bindgen`.
